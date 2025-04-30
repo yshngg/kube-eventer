@@ -3,13 +3,14 @@ package webhook
 import (
 	"bytes"
 	"fmt"
-	"github.com/AliyunContainerService/kube-eventer/util"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/AliyunContainerService/kube-eventer/util"
 
 	"github.com/AliyunContainerService/kube-eventer/common/filters"
 	"github.com/AliyunContainerService/kube-eventer/common/kubernetes"
@@ -77,18 +78,17 @@ func (ws *WebHookSink) Send(event *v1.Event) (err error) {
 	}
 
 	bodyBuffer := bytes.NewBuffer([]byte(body))
+	klog.V(1).Infof("Webhook request body: %v", body)
 	req, err := http.NewRequest(ws.method, ws.endpoint, bodyBuffer)
+	if err != nil {
+		klog.Errorf("Failed to create request,because of %v", err)
+	}
 
 	// append header to http request
-	if ws.headerMap != nil && len(ws.headerMap) != 0 {
+	if len(ws.headerMap) != 0 {
 		for k, v := range ws.headerMap {
 			req.Header.Set(k, v)
 		}
-	}
-
-	if err != nil {
-		klog.Errorf("Failed to create request,because of %v", err)
-		return err
 	}
 
 	resp, err := http.DefaultClient.Do(req)
@@ -98,6 +98,11 @@ func (ws *WebHookSink) Send(event *v1.Event) (err error) {
 	}
 	defer resp.Body.Close()
 
+	if klog.V(1) {
+		buff := new(bytes.Buffer)
+		buff.ReadFrom(resp.Body)
+		klog.Infof("Webhook response body: %v", buff.String())
+	}
 	if resp != nil && resp.StatusCode != http.StatusOK {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
