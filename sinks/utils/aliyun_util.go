@@ -1,12 +1,13 @@
 package utils
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/denverdino/aliyungo/metadata"
+	"github.com/AliyunContainerService/ack-ram-tool/pkg/ecsmetadata"
 	"io/ioutil"
 	"k8s.io/klog"
 	"os"
@@ -24,6 +25,30 @@ type AKInfo struct {
 	SecurityToken   string `json:"security.token"`
 	Expiration      string `json:"expiration"`
 	Keyring         string `json:"keyring"`
+}
+
+func (akInfo *AKInfo) IsExpired() bool {
+	if akInfo == nil {
+		klog.Errorf("determine whether akinfo is expired, err: %v", errors.New("akInfo is nil"))
+		return true
+	}
+
+	klog.V(7).Infof("akinfo Expiration: %v, Now: %v", akInfo.Expiration, time.Now().Format(StsTokenTimeLayout))
+
+	if len(akInfo.AccessKeyId) > 0 && len(akInfo.AccessKeySecret) > 0 && len(akInfo.SecurityToken) == 0 {
+		return false
+	}
+
+	t, err := time.Parse(StsTokenTimeLayout, akInfo.Expiration)
+	if err != nil {
+		klog.Errorf("failed to parse time layout, akInfo Expiration: %v, err: %v", akInfo.Expiration, err)
+		return true
+	}
+	if t.Before(time.Now()) {
+		klog.Errorf("invalid token which is expired, akInfo Expiration: %v, now: %v", akInfo.Expiration, time.Now())
+		return true
+	}
+	return false
 }
 
 func PKCS5UnPadding(origData []byte) []byte {
@@ -74,8 +99,8 @@ func GetOwnerAccountFromEnv() (accountId string, err error) {
 func ParseRegion() (string, error) {
 	region, err := GetRegionFromEnv()
 	if err != nil {
-		m := metadata.NewMetaData(nil)
-		region, err = m.Region()
+		m := ecsmetadata.DefaultClient
+		region, err = m.GetRegionId(context.Background())
 		if err != nil {
 			klog.Errorf("failed to get Region, because of %v", err)
 			return "", err
@@ -85,8 +110,8 @@ func ParseRegion() (string, error) {
 }
 
 func ParseRegionFromMeta() (string, error) {
-	m := metadata.NewMetaData(nil)
-	region, err := m.Region()
+	m := ecsmetadata.DefaultClient
+	region, err := m.GetRegionId(context.Background())
 	if err != nil {
 		klog.Errorf("failed to get Region, because of %v", err)
 		return "", err
@@ -97,8 +122,8 @@ func ParseRegionFromMeta() (string, error) {
 func ParseOwnerAccountId() (string, error) {
 	accountId, err := GetOwnerAccountFromEnv()
 	if err != nil {
-		m := metadata.NewMetaData(nil)
-		accountId, err = m.OwnerAccountID()
+		m := ecsmetadata.DefaultClient
+		accountId, err = m.GetOwnerAccountId(context.Background())
 		if err != nil {
 			klog.Errorf("failed to get OwnerAccount, because of %v", err)
 			return "", err
@@ -109,14 +134,14 @@ func ParseOwnerAccountId() (string, error) {
 
 func ParseAKInfoFromMeta() (*AKInfo, error) {
 	var akInfo AKInfo
-	m := metadata.NewMetaData(nil)
-	roleName, err := m.RoleName()
+	m := ecsmetadata.DefaultClient
+	roleName, err := m.GetRoleName(context.Background())
 	if err != nil {
 		klog.Errorf("failed to get RoleName,because of %v", err)
 		return nil, err
 	}
 
-	auth, err := m.RamRoleToken(roleName)
+	auth, err := m.GetRoleCredentials(context.Background(), roleName)
 	if err != nil {
 		klog.Errorf("failed to get RamRoleToken,because of %v", err)
 		return nil, err
@@ -124,6 +149,7 @@ func ParseAKInfoFromMeta() (*AKInfo, error) {
 	akInfo.AccessKeyId = auth.AccessKeyId
 	akInfo.AccessKeySecret = auth.AccessKeySecret
 	akInfo.SecurityToken = auth.SecurityToken
+	akInfo.Expiration = auth.Expiration.Format(StsTokenTimeLayout)
 
 	return &akInfo, nil
 }

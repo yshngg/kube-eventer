@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.20.7 AS build-env
+FROM --platform=$BUILDPLATFORM golang:1.25.3 AS build-env
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG BUILDARCH
@@ -9,20 +9,24 @@ ENV GOPATH /:/src/github.com/AliyunContainerService/kube-eventer/vendor
 ENV GO111MODULE on
 ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /src/github.com/AliyunContainerService/kube-eventer
-RUN apt-get update -y && apt-get install gcc ca-certificates
+RUN apt-get update -y
+RUN apt-get install -y gcc ca-certificates
 
 RUN echo "I am running on $BUILDPLATFORM $BUILDARCH, building for $TARGETPLATFORM $TARGETARCH"
 
 RUN make ARCH=$TARGETARCH
 
 
-FROM alpine:3.16
+FROM registry-cn-hangzhou.ack.aliyuncs.com/dev/alpine:3.18-update
+# this image is maintained by Alibaba Cloud Container Service Team with CVE fixed.
 LABEL maintainer="KeyOfSpectator <shichun.fsc@alibaba-inc.com>"
 
 RUN apk --no-cache --update upgrade
 
 COPY --from=build-env /src/github.com/AliyunContainerService/kube-eventer/kube-eventer /
 COPY --from=build-env /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+RUN ls -hl
 
 ENV TZ "Asia/Shanghai"
 RUN apk add --no-cache tzdata
