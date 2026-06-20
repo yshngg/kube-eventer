@@ -24,13 +24,12 @@ require (
 	github.com/smartystreets/go-aws-auth v0.0.0-20180515143844-0c1422d1fdb9
 	github.com/smartystreets/gunit v1.0.0 // indirect
 	github.com/stretchr/testify v1.6.1
-	go.mongodb.org/mongo-driver v1.5.1
-	golang.org/x/sys v0.2.0 // indirect
+	go.mongodb.org/mongo-driver v1.17.7
 	gopkg.in/olivere/elastic.v3 v3.0.75
 	gopkg.in/olivere/elastic.v5 v5.0.81
 	gopkg.in/olivere/elastic.v6 v6.2.23
-	k8s.io/api v0.17.4
-	k8s.io/apimachinery v0.17.4
-	k8s.io/client-go v0.17.4
+	k8s.io/api v0.17.16
+	k8s.io/apimachinery v0.17.16
+	k8s.io/client-go v0.17.16
 	k8s.io/klog v1.0.0
 )
